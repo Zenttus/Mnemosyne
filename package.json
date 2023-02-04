@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-mnemosyne",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "This is a note managment session maker plugin for Obsidian. This plugin helps you create workflows to review your notes with filtering and ordering tools to match most preferences.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
