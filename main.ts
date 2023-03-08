@@ -119,35 +119,57 @@ class MnemosyneSession {
 			this.files = this.files.filter(file => pathsToInclude.includes(file.path));
 		}
 		this.files = this.files.filter(file => !pathsToExclude.includes(file.path));
-		
+		console.log(tagsToExclude);
+		console.log(tagsToInclude);
 		// Tags
-		if(tagsToInclude.length > 0) {
-			this.files = this.files.filter(file => {
-				for (const tag of tagsToInclude) {
-					if (file.tags.includes(tag)) {
-						return true;
-					}
+		if (tagsToInclude.length > 0) {
+			this.files = this.files.filter((file) => {
+				// Check if the file exists and is a TFile
+				if (file && file instanceof TFile) {
+					// Get the cached frontmatter of the TFile
+					const cache = app.metadataCache.getFileCache(file);
+					if (cache) {
+						const frontmatter = cache.frontmatter;
+						if (frontmatter) {
+							// Check if the frontmatter has a "tags" property
+							if ("tags" in frontmatter) {
+								// Get the tags as an array
+								const tags = frontmatter.tags;
+								// Check if the tags array includes the tag
+								return tagsToInclude.some(tag => tags.includes(tag));
+							}
+						}
+	  				}
 				}
-				return false;
 			});
 		}
-		this.files = this.files.filter(file => {
-			let hasTag = false;
-			for (const tag of tagsToExclude) {
-				if (file.tags.includes(tag)) {
-					hasTag = true;
-					break;
+		if (tagsToExclude.length > 0) {
+			this.files = this.files.filter((file) => {
+				// Check if the file exists and is a TFile
+				if (file && file instanceof TFile) {
+					// Get the cached frontmatter of the TFile
+					const cache = app.metadataCache.getFileCache(file);
+					if (cache) {
+						const frontmatter = cache.frontmatter;
+						if (frontmatter) {
+							// Check if the frontmatter has a "tags" property
+							if ("tags" in frontmatter) {
+								// Get the tags as an array
+								const tags = frontmatter.tags;
+								// Check if the tags array includes the tag
+								return !tagsToExclude.some(tag => tags.includes(tag));
+							}
+						}
+	  				}
 				}
-			}
-			return !hasTag;
-		});
-
+			});
+		}
 	}
 	
 	nextNote() {
 		if (this.files.length === 0){
 			this.sessionActive = false;
-			this.statusBarItemEl.setText("Mnemosyne session completed.");
+			// this.statusBarItemEl.setText("Mnemosyne session completed.");
 			window.alert("Mnemonic session completed");
 			return null;
 		}
