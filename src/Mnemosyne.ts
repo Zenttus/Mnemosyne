@@ -1,9 +1,8 @@
 // Mnemosyne.ts
 
-import { Plugin, Notice, addIcon } from 'obsidian';
+import { Plugin, Notice } from 'obsidian';
 import { MnemosyneSession } from './MnemosyneSession';
 import { MnemosyneSettings, DEFAULT_SETTINGS } from './MnemosyneSettings';
-import { MnemosyneSettingTab } from './MnemosyneSettingTab';
 import { MnemosyneSidebarView } from './MnemosyneSidebarView';
 
 export default class Mnemosyne extends Plugin {
@@ -43,10 +42,7 @@ export default class Mnemosyne extends Plugin {
             }
         });
 
-        // Add settings tab
-        this.addSettingTab(new MnemosyneSettingTab(this.app, this));
-
-        // Add sidebar view
+        // Register the sidebar view
         this.registerView(
             'mnemosyne-sidebar-view',
             (leaf) => new MnemosyneSidebarView(leaf, this)
@@ -54,19 +50,6 @@ export default class Mnemosyne extends Plugin {
 
         // Add ribbon icon
         this.addRibbonIcon('switch', 'Mnemosyne', () => this.activateSidebarView());
-    }
-
-    addStylesheet() {
-        this.registerDomEvent(document, 'DOMContentLoaded', () => {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = this.getAssetPath('styles.css');
-            document.head.appendChild(link);
-        });
-    }
-
-    getAssetPath(assetName: string): string {
-        return this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/${assetName}`);
     }
 
     async onunload() {
@@ -89,6 +72,19 @@ export default class Mnemosyne extends Plugin {
         } else {
             new Notice('No right leaf available to display the Mnemosyne sidebar.');
         }
+    }
+
+    addStylesheet() {
+        this.registerDomEvent(document, 'DOMContentLoaded', () => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = this.getAssetPath('styles.css');
+            document.head.appendChild(link);
+        });
+    }
+
+    getAssetPath(assetName: string): string {
+        return this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/${assetName}`);
     }
 
     // Load plugin settings

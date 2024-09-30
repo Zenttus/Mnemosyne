@@ -1,17 +1,15 @@
 // MnemosyneSettings.ts
 
 export interface MnemosyneSettings {
-    tagsToInclude: string[];
-    tagsToExclude: string[];
-    pathsToInclude: string[];
-    pathsToExclude: string[];
-    iterateAllFiles: boolean; // New setting to include all files
+    includedTags: string[];
+    excludedTags: string[];
+    allTagsSelected: boolean;
+    iterateAllFiles: boolean;
 }
 
 export const DEFAULT_SETTINGS: MnemosyneSettings = {
-    tagsToInclude: [],
-    tagsToExclude: [],
-    pathsToInclude: [],
-    pathsToExclude: [],
+    includedTags: [],
+    excludedTags: [],
+    allTagsSelected: false,
     iterateAllFiles: false,
 };

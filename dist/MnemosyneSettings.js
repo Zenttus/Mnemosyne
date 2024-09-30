@@ -1,9 +1,8 @@
 // MnemosyneSettings.ts
 export const DEFAULT_SETTINGS = {
-    tagsToInclude: [],
-    tagsToExclude: [],
-    pathsToInclude: [],
-    pathsToExclude: [],
+    includedTags: [],
+    excludedTags: [],
+    allTagsSelected: false,
     iterateAllFiles: false,
 };
 //# sourceMappingURL=MnemosyneSettings.js.map

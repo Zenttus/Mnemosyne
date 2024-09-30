@@ -5,10 +5,8 @@ import Mnemosyne from './Mnemosyne';
 export class MnemosyneSidebarView extends ItemView {
     plugin: Mnemosyne;
     availableTags: string[] = [];
-
-    // Store references to the containers
-    includeTagsContainer!: HTMLElement;
-    excludeTagsContainer!: HTMLElement;
+    tagsContainer!: HTMLElement;
+    noteCountElement!: HTMLElement;
 
     constructor(leaf: WorkspaceLeaf, plugin: Mnemosyne) {
         super(leaf);
@@ -31,34 +29,41 @@ export class MnemosyneSidebarView extends ItemView {
         const header = container.createEl('h4', { text: 'Mnemosyne Session' });
         header.style.marginBottom = '10px';
 
-        const buttonContainer = container.createEl('div', { cls: 'button-container' });
-        buttonContainer.style.display = 'flex';
-        buttonContainer.style.justifyContent = 'space-between';
-        buttonContainer.style.marginBottom = '20px';
+        // Create container for session control buttons
+        const sessionControlContainer = container.createDiv({ cls: 'session-control-container' });
+        sessionControlContainer.style.display = 'flex';
+        sessionControlContainer.style.flexDirection = 'column';
+        sessionControlContainer.style.gap = '10px';
+        sessionControlContainer.style.marginBottom = '20px';
 
         // Start Session button
-        const startSessionButton = new ButtonComponent(buttonContainer);
+        const startSessionButton = new ButtonComponent(sessionControlContainer);
         startSessionButton.setButtonText('Start Session').onClick(() => {
             this.plugin.mnemosyneSession.startSession();
         });
 
         // Next Note button
-        const nextNoteButton = new ButtonComponent(buttonContainer);
+        const nextNoteButton = new ButtonComponent(sessionControlContainer);
         nextNoteButton.setButtonText('Next Note').onClick(() => {
             this.plugin.mnemosyneSession.getNextNote();
         });
 
-        // Settings header
-        const settingsHeader = container.createEl('h5', { text: 'Tag Selection' });
-        settingsHeader.style.marginBottom = '10px';
+        // Remove Note button
+        const removeNoteButton = new ButtonComponent(sessionControlContainer);
+        removeNoteButton.setButtonText('Remove Note').onClick(() => {
+            this.plugin.mnemosyneSession.removeCurrentNote();
+        });
 
-        // Create containers for include and exclude sections
-        this.includeTagsContainer = container.createDiv({ cls: 'mnemosyne-include-tags-container' });
-        this.excludeTagsContainer = container.createDiv({ cls: 'mnemosyne-exclude-tags-container' });
+        // Add note count display
+        this.noteCountElement = container.createEl('div', { cls: 'mnemosyne-note-count' });
+        this.noteCountElement.style.marginBottom = '10px';
+        this.updateNoteCount();
 
-        // Create tag buttons for inclusion and exclusion
-        this.createTagButtons(this.includeTagsContainer, 'Include Tags', this.plugin.settings.tagsToInclude, 'tagsToInclude');
-        this.createTagButtons(this.excludeTagsContainer, 'Exclude Tags', this.plugin.settings.tagsToExclude, 'tagsToExclude');
+        // Create container for tags
+        this.tagsContainer = container.createDiv({ cls: 'mnemosyne-tags-container' });
+
+        // Create tag buttons
+        this.createTagButtons();
     }
 
     async onClose() {
@@ -77,58 +82,180 @@ export class MnemosyneSidebarView extends ItemView {
         this.availableTags = Array.from(tagSet);
     }
 
-    // Create tag buttons for selection
-    createTagButtons(container: HTMLElement, title: string, selectedTags: string[], settingKey: 'tagsToInclude' | 'tagsToExclude') {
+    // Create tag buttons with three-state cycling
+    createTagButtons() {
+        const updateNoteCount = async () => {
+            await this.plugin.saveSettings();
+            this.updateNoteCount();
+        };
         // Clear the container to prevent duplication
-        container.empty();
+        this.tagsContainer.empty();
 
-        const sectionHeader = container.createEl('h5', { text: title });
-        sectionHeader.style.marginTop = '20px';
-        sectionHeader.style.marginBottom = '10px';
+        // Create a header container for the title and reset button
+        const headerContainer = this.tagsContainer.createDiv({ cls: 'header-container' });
+        headerContainer.style.display = 'flex';
+        headerContainer.style.justifyContent = 'space-between';
+        headerContainer.style.alignItems = 'center';
+        headerContainer.style.marginTop = '20px';
+        headerContainer.style.marginBottom = '10px';
 
-        const buttonGrid = container.createDiv({ cls: 'mnemosyne-button-grid' });
+        const sectionHeader = headerContainer.createEl('h5', { text: 'Tags' });
+        sectionHeader.style.margin = '0';
 
-        // Determine tags selected in the opposite field to prevent duplicates
-        const oppositeKey = settingKey === 'tagsToInclude' ? 'tagsToExclude' : 'tagsToInclude';
-        const oppositeTags = this.plugin.settings[oppositeKey];
+        // Add a reset button
+        const resetButton = headerContainer.createEl('button', { cls: 'reset-button' });
+        resetButton.innerHTML = '⟲'; // Reset icon
+        resetButton.title = 'Reset tags';
+
+        resetButton.onclick = async () => {
+            // Clear the selected tags
+            this.plugin.settings.includedTags = [];
+            this.plugin.settings.excludedTags = [];
+            this.plugin.settings.allTagsSelected = false;
+            // Save settings
+            await this.plugin.saveSettings();
+            // Refresh tags
+            this.createTagButtons();
+        };
+
+        const buttonGrid = this.tagsContainer.createDiv({ cls: 'mnemosyne-button-grid' });
+
+        // Add '*' button
+        const allTagsButton = buttonGrid.createEl('button', { text: '*', cls: 'tag-button' });
+
+        // Apply selected style if '*' is selected
+        if (this.plugin.settings.allTagsSelected) {
+            allTagsButton.addClass('tag-button-all-selected');
+        }
+
+        allTagsButton.addEventListener('click', async () => {
+            if (this.plugin.settings.allTagsSelected) {
+                // Deselect '*'
+                this.plugin.settings.allTagsSelected = false;
+                allTagsButton.removeClass('tag-button-all-selected');
+            } else {
+                // Select '*', reset other tags
+                this.plugin.settings.allTagsSelected = true;
+                this.plugin.settings.includedTags = [];
+                this.plugin.settings.excludedTags = [];
+                allTagsButton.addClass('tag-button-all-selected');
+            }
+
+            // Save settings
+            await this.plugin.saveSettings();
+
+            // Refresh tags
+            this.createTagButtons();
+            
+            // Update note count after changes
+            await updateNoteCount();
+        });
 
         // Create a button for each tag
         this.availableTags.forEach(tag => {
-            // Skip tags selected in the opposite field
-            if (oppositeTags.includes(tag)) return;
+            // Disable other tags if '*' is selected
+            if (this.plugin.settings.allTagsSelected) return;
 
             const button = buttonGrid.createEl('button', { text: tag, cls: 'tag-button' });
 
-            // Apply selected style if the tag is selected
-            if (selectedTags.includes(tag)) {
-                button.addClass('tag-button-selected');
+            // Determine the state of the tag
+            let state: 'neutral' | 'included' | 'excluded' = 'neutral';
+            if (this.plugin.settings.includedTags.includes(tag)) {
+                state = 'included';
+                button.addClass('tag-button-included');
+            } else if (this.plugin.settings.excludedTags.includes(tag)) {
+                state = 'excluded';
+                button.addClass('tag-button-excluded');
             }
 
-            button.addEventListener('click', async () => {
-                if (selectedTags.includes(tag)) {
-                    // Deselect the tag
-                    selectedTags.splice(selectedTags.indexOf(tag), 1);
-                    button.removeClass('tag-button-selected');
-                } else {
-                    // Select the tag
-                    selectedTags.push(tag);
-                    button.addClass('tag-button-selected');
+            // Add hover event listeners to show potential state change
+            button.addEventListener('mouseover', () => {
+                if (state === 'neutral') {
+                    button.addClass('included-potential');
+                } else if (state === 'included') {
+                    button.addClass('excluded-potential');
+                } else if (state === 'excluded') {
+                    button.addClass('neutral-potential');
+                }
+            });
 
-                    // Remove from opposite field if necessary
-                    const oppositeIndex = this.plugin.settings[oppositeKey].indexOf(tag);
-                    if (oppositeIndex !== -1) {
-                        this.plugin.settings[oppositeKey].splice(oppositeIndex, 1);
-                    }
+            button.addEventListener('mouseout', () => {
+                button.removeClass('included-potential');
+                button.removeClass('excluded-potential');
+                button.removeClass('neutral-potential');
+            });
+
+            button.addEventListener('click', async () => {
+                // Remove both state classes first
+                button.removeClass('tag-button-included');
+                button.removeClass('tag-button-excluded');
+                button.removeClass('included-potential');
+                button.removeClass('excluded-potential');
+                button.removeClass('neutral-potential');
+
+                // Cycle through states
+                if (state === 'neutral') {
+                    // Include the tag
+                    this.plugin.settings.includedTags.push(tag);
+                    state = 'included';
+                    button.addClass('tag-button-included');
+                } else if (state === 'included') {
+                    // Exclude the tag
+                    this.plugin.settings.includedTags.splice(this.plugin.settings.includedTags.indexOf(tag), 1);
+                    this.plugin.settings.excludedTags.push(tag);
+                    state = 'excluded';
+                    button.addClass('tag-button-excluded');
+                } else if (state === 'excluded') {
+                    // Reset to neutral
+                    this.plugin.settings.excludedTags.splice(this.plugin.settings.excludedTags.indexOf(tag), 1);
+                    state = 'neutral';
+                    // No class added for neutral state
                 }
 
                 // Save settings
-                this.plugin.settings[settingKey] = selectedTags;
                 await this.plugin.saveSettings();
+                this.createTagButtons();
 
-                // Refresh both sections to update buttons
-                this.createTagButtons(this.includeTagsContainer, 'Include Tags', this.plugin.settings.tagsToInclude, 'tagsToInclude');
-                this.createTagButtons(this.excludeTagsContainer, 'Exclude Tags', this.plugin.settings.tagsToExclude, 'tagsToExclude');
+                await updateNoteCount();
             });
         });
     }
+
+     // Method to update the note count display
+     updateNoteCount() {
+        const noteCount = this.calculateMatchingNotes();
+        this.noteCountElement.setText(`Notes matching current selection: ${noteCount}`);
+    }
+
+    // Method to calculate the number of notes matching the current tag selection
+    calculateMatchingNotes(): number {
+        const allFiles = this.app.vault.getMarkdownFiles();
+
+        const matchingFiles = allFiles.filter((file) => {
+            const cache = this.app.metadataCache.getFileCache(file);
+            const tags = cache ? getAllTags(cache) ?? [] : [];
+
+            // Handle '*' selection
+            if (this.plugin.settings.allTagsSelected) {
+                return true; // Include all notes
+            }
+
+            // Exclude notes that have any of the excluded tags
+            if (this.plugin.settings.excludedTags.some(tag => tags.includes(tag))) {
+                return false;
+            }
+
+            // Include notes that have any of the included tags
+            if (this.plugin.settings.includedTags.length > 0) {
+                return this.plugin.settings.includedTags.some(tag => tags.includes(tag));
+            }
+
+            // If no tags are included or excluded, include the note
+            return true;
+        });
+
+        return matchingFiles.length;
+    }
+
+  
 }
