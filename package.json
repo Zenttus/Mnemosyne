@@ -1,24 +1,27 @@
 {
 	"name": "obsidian-mnemosyne",
 	"version": "1.0.0",
-	"description": "This is a note managment session maker plugin for Obsidian. This plugin helps you create workflows to review your notes with filtering and ordering tools to match most preferences.",
+	"description": "An Obsidian plugin for iterative note review.",
 	"main": "main.js",
 	"scripts": {
-		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"version": "node version-bump.mjs && git add manifest.json versions.json"
+		"build": "npm run clean && tsc && node esbuild.config.mjs production",
+		"dev": "tsc -watch",
+		"clean": "rimraf dist"
 	},
-	"keywords": [],
-	"author": "",
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"mnemosyne",
+		"note review"
+	],
+	"author": "Your Name",
 	"license": "MIT",
 	"devDependencies": {
-		"@types/node": "^16.11.6",
-		"@typescript-eslint/eslint-plugin": "5.29.0",
-		"@typescript-eslint/parser": "5.29.0",
-		"builtin-modules": "3.3.0",
-		"esbuild": "0.17.3",
-		"obsidian": "latest",
-		"tslib": "2.4.0",
-		"typescript": "4.7.4"
+		"@types/node": "^16.11.7",
+		"builtin-modules": "^4.0.0",
+		"esbuild": "^0.12.29",
+		"obsidian": "^0.12.0",
+		"rimraf": "^3.0.2",
+		"typescript": "^4.5.2"
 	}
 }
