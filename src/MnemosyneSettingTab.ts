@@ -4,27 +4,29 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import Mnemosyne from './Mnemosyne';
 
 export class MnemosyneSettingTab extends PluginSettingTab {
-    plugin: Mnemosyne;
+  plugin: Mnemosyne;
 
-    constructor(app: App, plugin: Mnemosyne) {
-        super(app, plugin);
-        this.plugin = plugin;
-    }
+  constructor(app: App, plugin: Mnemosyne) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
 
-    display() {
-        const { containerEl } = this;
-        containerEl.empty();
-        containerEl.createEl('h2', { text: 'Settings for Mnemosyne.' });
+  display(): void {
+    const { containerEl } = this;
 
-        // Toggle to iterate over all files
-        new Setting(containerEl)
-            .setName('Iterate Over All Files')
-            .setDesc('Include all files in the vault for the Mnemosyne session, ignoring any filters.')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.iterateAllFiles)
-                .onChange(async (value) => {
-                    this.plugin.settings.iterateAllFiles = value;
-                    await this.plugin.saveSettings();
-                }));
-    }
+    containerEl.empty();
+    containerEl.createEl('h2', { text: 'Mnemosyne Settings' });
+
+    new Setting(containerEl)
+      .setName('Iterate All Files')
+      .setDesc('Include all notes in the session, ignoring tags.')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.iterateAllFiles)
+          .onChange(async (value) => {
+            this.plugin.settings.iterateAllFiles = value;
+            await this.plugin.saveSettings();
+          })
+      );
+  }
 }

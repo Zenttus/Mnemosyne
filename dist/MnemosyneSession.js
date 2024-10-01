@@ -34,34 +34,29 @@ export class MnemosyneSession {
     }
     applyFilters() {
         const allFiles = this.app.vault.getMarkdownFiles();
-        console.log(`Total markdown files: ${allFiles.length}`);
-        // If iterateAllFiles is true, include all notes
-        if (this.settings.iterateAllFiles) {
-            this.files = allFiles;
-            console.log(`Iterating over all files.`);
-        }
-        else {
-            this.files = allFiles.filter((file) => {
-                var _a;
-                const cache = this.app.metadataCache.getFileCache(file);
-                const tags = cache ? (_a = getAllTags(cache)) !== null && _a !== void 0 ? _a : [] : [];
-                // Handle '*' selection
-                if (this.settings.allTagsSelected) {
-                    return true; // Include all notes
-                }
-                // Exclude notes that have any of the excluded tags
-                if (this.settings.excludedTags.some(tag => tags.includes(tag))) {
-                    return false;
-                }
-                // Include notes that have any of the included tags
-                if (this.settings.includedTags.length > 0) {
-                    return this.settings.includedTags.some(tag => tags.includes(tag));
-                }
-                // If no tags are included or excluded, include the note
+        this.files = allFiles.filter((file) => {
+            var _a;
+            const cache = this.app.metadataCache.getFileCache(file);
+            const tags = cache ? (_a = getAllTags(cache)) !== null && _a !== void 0 ? _a : [] : [];
+            // If 'iterateAllFiles' is true, include all notes regardless of tags
+            if (this.settings.iterateAllFiles) {
                 return true;
-            });
-        }
-        console.log(`Files after filtering: ${this.files.length}`);
+            }
+            // If 'allTagsSelected' is true, include all notes
+            if (this.settings.allTagsSelected) {
+                return true;
+            }
+            // Exclude notes that have any of the excluded tags
+            if (this.settings.excludedTags.some((tag) => tags.includes(tag))) {
+                return false;
+            }
+            // If included tags are specified, include notes that have any of them
+            if (this.settings.includedTags.length > 0) {
+                return this.settings.includedTags.some((tag) => tags.includes(tag));
+            }
+            // If no tags are specified, exclude the note (since 'iterateAllFiles' and 'allTagsSelected' are false)
+            return false;
+        });
         this.shuffleFiles();
     }
     shuffleFiles() {
@@ -99,6 +94,9 @@ export class MnemosyneSession {
             if (this.files.length === 0) {
                 new Notice("All notes have been removed from the session.");
                 this.statusBarItem.setText('No Mnemosyne session active.');
+                // Reset session state
+                this.currentIndex = 0;
+                this.files = [];
                 return;
             }
             // Open the next note

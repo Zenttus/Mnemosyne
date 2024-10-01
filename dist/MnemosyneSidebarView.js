@@ -3,6 +3,7 @@ export class MnemosyneSidebarView extends ItemView {
     constructor(leaf, plugin) {
         super(leaf);
         this.availableTags = [];
+        this.tagCounts = {};
         this.plugin = plugin;
         this.fetchAvailableTags();
     }
@@ -46,21 +47,38 @@ export class MnemosyneSidebarView extends ItemView {
         this.tagsContainer = container.createDiv({ cls: 'mnemosyne-tags-container' });
         // Create tag buttons
         this.createTagButtons();
+        // Register to update tags when the vault changes
+        this.registerEvent(this.app.vault.on('modify', this.handleVaultChange.bind(this)));
+        this.registerEvent(this.app.vault.on('delete', this.handleVaultChange.bind(this)));
+        this.registerEvent(this.app.vault.on('create', this.handleVaultChange.bind(this)));
+    }
+    // Handler for vault changes
+    handleVaultChange() {
+        // Re-fetch tags and counts
+        this.fetchAvailableTags();
+        // Re-create tag buttons with updated counts
+        this.createTagButtons();
+        // Update the note count display
+        this.updateNoteCount();
     }
     async onClose() {
         // No cleanup necessary
     }
-    // Fetch all available tags from the vault
+    // Fetch all available tags from the vault and their counts
     fetchAvailableTags() {
         const files = this.app.vault.getMarkdownFiles();
-        const tagSet = new Set();
+        const tagCounts = {};
         files.forEach(file => {
             var _a;
             const cache = this.app.metadataCache.getFileCache(file);
             const tags = cache ? (_a = getAllTags(cache)) !== null && _a !== void 0 ? _a : [] : [];
-            tags.forEach(tag => tagSet.add(tag));
+            tags.forEach(tag => {
+                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+            });
         });
-        this.availableTags = Array.from(tagSet);
+        // Convert the tags to an array and sort alphabetically
+        this.availableTags = Object.keys(tagCounts).sort((a, b) => a.localeCompare(b));
+        this.tagCounts = tagCounts;
     }
     // Create tag buttons with three-state cycling
     createTagButtons() {
@@ -125,7 +143,11 @@ export class MnemosyneSidebarView extends ItemView {
             // Disable other tags if '*' is selected
             if (this.plugin.settings.allTagsSelected)
                 return;
-            const button = buttonGrid.createEl('button', { text: tag, cls: 'tag-button' });
+            // Get the count for the tag
+            const tagCount = this.tagCounts[tag] || 0;
+            // Update the button text to include the count
+            const buttonText = `${tag} (${tagCount})`;
+            const button = buttonGrid.createEl('button', { text: buttonText, cls: 'tag-button' });
             // Determine the state of the tag
             let state = 'neutral';
             if (this.plugin.settings.includedTags.includes(tag)) {

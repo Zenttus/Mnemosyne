@@ -8,12 +8,11 @@ export class MnemosyneSettingTab extends PluginSettingTab {
     display() {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.createEl('h2', { text: 'Settings for Mnemosyne.' });
-        // Toggle to iterate over all files
+        containerEl.createEl('h2', { text: 'Mnemosyne Settings' });
         new Setting(containerEl)
-            .setName('Iterate Over All Files')
-            .setDesc('Include all files in the vault for the Mnemosyne session, ignoring any filters.')
-            .addToggle(toggle => toggle
+            .setName('Iterate All Files')
+            .setDesc('Include all notes in the session, ignoring tags.')
+            .addToggle((toggle) => toggle
             .setValue(this.plugin.settings.iterateAllFiles)
             .onChange(async (value) => {
             this.plugin.settings.iterateAllFiles = value;

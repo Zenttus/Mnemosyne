@@ -1,8 +1,8 @@
-// Mnemosyne.ts
 import { Plugin, Notice } from 'obsidian';
 import { MnemosyneSession } from './MnemosyneSession';
 import { DEFAULT_SETTINGS } from './MnemosyneSettings';
 import { MnemosyneSidebarView } from './MnemosyneSidebarView';
+import { MnemosyneSettingTab } from './MnemosyneSettingTab';
 export default class Mnemosyne extends Plugin {
     async onload() {
         console.log("Mnemosyne plugin loaded.");
@@ -30,10 +30,26 @@ export default class Mnemosyne extends Plugin {
                 new Notice('Mnemosyne session started.');
             }
         });
+        // **Add the Remove Note command**
+        this.addCommand({
+            id: 'remove-current-note-mnemosyne',
+            name: 'Remove Current Note from Session',
+            callback: () => {
+                this.mnemosyneSession.removeCurrentNote();
+            },
+            // **Add a default hotkey (e.g., Ctrl+Shift+R on Windows/Linux or Cmd+Shift+R on macOS)**
+            hotkeys: [
+                {
+                    modifiers: ["Mod", "Shift"],
+                    key: "R"
+                }
+            ]
+        });
         // Register the sidebar view
         this.registerView('mnemosyne-sidebar-view', (leaf) => new MnemosyneSidebarView(leaf, this));
         // Add ribbon icon
         this.addRibbonIcon('switch', 'Mnemosyne', () => this.activateSidebarView());
+        this.addSettingTab(new MnemosyneSettingTab(this.app, this));
     }
     async onunload() {
         console.log("Mnemosyne plugin unloaded.");
@@ -64,11 +80,9 @@ export default class Mnemosyne extends Plugin {
     getAssetPath(assetName) {
         return this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/${assetName}`);
     }
-    // Load plugin settings
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     }
-    // Save plugin settings
     async saveSettings() {
         await this.saveData(this.settings);
     }
