@@ -34,29 +34,36 @@ export class MnemosyneSession {
     }
     applyFilters() {
         const allFiles = this.app.vault.getMarkdownFiles();
+        console.log(`Total markdown files: ${allFiles.length}`);
         this.files = allFiles.filter((file) => {
             var _a;
             const cache = this.app.metadataCache.getFileCache(file);
             const tags = cache ? (_a = getAllTags(cache)) !== null && _a !== void 0 ? _a : [] : [];
-            // If 'iterateAllFiles' is true, include all notes regardless of tags
+            // 1. If 'iterateAllFiles' is true, include all notes regardless of tags
             if (this.settings.iterateAllFiles) {
                 return true;
             }
-            // If 'allTagsSelected' is true, include all notes
+            // 2. If 'allTagsSelected' is true, include all notes
             if (this.settings.allTagsSelected) {
                 return true;
             }
-            // Exclude notes that have any of the excluded tags
+            // 3. Exclude notes that have any of the excluded tags
             if (this.settings.excludedTags.some((tag) => tags.includes(tag))) {
-                return false;
+                return false; // Exclude this note
             }
-            // If included tags are specified, include notes that have any of them
+            // 4. If included tags are specified, include notes that have any of them
             if (this.settings.includedTags.length > 0) {
-                return this.settings.includedTags.some((tag) => tags.includes(tag));
+                if (this.settings.includedTags.some((tag) => tags.includes(tag))) {
+                    return true; // Include this note
+                }
+                else {
+                    return false; // Exclude this note
+                }
             }
-            // If no tags are specified, exclude the note (since 'iterateAllFiles' and 'allTagsSelected' are false)
-            return false;
+            // 5. If no included tags are specified, and the note doesn't have any excluded tags, include it
+            return true; // Include this note
         });
+        console.log(`Files after filtering: ${this.files.length}`);
         this.shuffleFiles();
     }
     shuffleFiles() {

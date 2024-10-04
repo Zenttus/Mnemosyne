@@ -261,32 +261,33 @@ export class MnemosyneSidebarView extends ItemView {
     // Method to calculate the number of notes matching the current tag selection
     calculateMatchingNotes(): number {
         const allFiles = this.app.vault.getMarkdownFiles();
-
+      
         const matchingFiles = allFiles.filter((file) => {
-            const cache = this.app.metadataCache.getFileCache(file);
-            const tags = cache ? getAllTags(cache) ?? [] : [];
-
-            // Handle '*' selection
-            if (this.plugin.settings.allTagsSelected) {
-                return true; // Include all notes
-            }
-
-            // Exclude notes that have any of the excluded tags
-            if (this.plugin.settings.excludedTags.some(tag => tags.includes(tag))) {
-                return false;
-            }
-
-            // Include notes that have any of the included tags
-            if (this.plugin.settings.includedTags.length > 0) {
-                return this.plugin.settings.includedTags.some(tag => tags.includes(tag));
-            }
-
-            // If no tags are included or excluded, include the note
+          const cache = this.app.metadataCache.getFileCache(file);
+          const tags = cache ? getAllTags(cache) ?? [] : [];
+      
+          if (this.plugin.settings.iterateAllFiles) {
             return true;
+          }
+      
+          if (this.plugin.settings.allTagsSelected) {
+            return true;
+          }
+      
+          if (this.plugin.settings.excludedTags.some((tag) => tags.includes(tag))) {
+            return false;
+          }
+      
+          if (this.plugin.settings.includedTags.length > 0) {
+            return this.plugin.settings.includedTags.some((tag) => tags.includes(tag));
+          }
+      
+          return true;
         });
-
+      
         return matchingFiles.length;
-    }
+      }
+      
 
   
 }

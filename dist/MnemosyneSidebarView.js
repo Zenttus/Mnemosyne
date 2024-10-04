@@ -221,19 +221,18 @@ export class MnemosyneSidebarView extends ItemView {
             var _a;
             const cache = this.app.metadataCache.getFileCache(file);
             const tags = cache ? (_a = getAllTags(cache)) !== null && _a !== void 0 ? _a : [] : [];
-            // Handle '*' selection
-            if (this.plugin.settings.allTagsSelected) {
-                return true; // Include all notes
+            if (this.plugin.settings.iterateAllFiles) {
+                return true;
             }
-            // Exclude notes that have any of the excluded tags
-            if (this.plugin.settings.excludedTags.some(tag => tags.includes(tag))) {
+            if (this.plugin.settings.allTagsSelected) {
+                return true;
+            }
+            if (this.plugin.settings.excludedTags.some((tag) => tags.includes(tag))) {
                 return false;
             }
-            // Include notes that have any of the included tags
             if (this.plugin.settings.includedTags.length > 0) {
-                return this.plugin.settings.includedTags.some(tag => tags.includes(tag));
+                return this.plugin.settings.includedTags.some((tag) => tags.includes(tag));
             }
-            // If no tags are included or excluded, include the note
             return true;
         });
         return matchingFiles.length;
