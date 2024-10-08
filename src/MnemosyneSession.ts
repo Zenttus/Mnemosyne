@@ -1,143 +1,205 @@
-import { TFile, App, Notice, getAllTags } from 'obsidian';
+// MnemosyneSession.ts
+
+import { TFile, App, Notice, getAllTags, WorkspaceLeaf } from 'obsidian';
 import { MnemosyneSettings } from './MnemosyneSettings';
+import { matchesFilters } from './MnemosyneUtils';
+import { EffectManager } from './EffectManager';
 
 export class MnemosyneSession {
-    private files: TFile[] = [];
-    private settings: MnemosyneSettings;
-    private statusBarItem: HTMLElement;
-    private app: App;
+  private files: TFile[] = [];
+  private settings: MnemosyneSettings;
+  private statusBarItem: HTMLElement;
+  private app: App;
 
-    private currentIndex: number = 0;
+  private currentIndex: number = 0;
+  private intervalId: number | null = null;
+  private remainingTime: number = 0;
+  private effectManager: EffectManager;
 
-    constructor(app: App, settings: MnemosyneSettings, statusBarItem: HTMLElement) {
-        this.app = app;
-        this.settings = settings;
-        this.statusBarItem = statusBarItem;
+  // Store original content
+  private originalContent: string = '';
+  private originalContentLeaf: WorkspaceLeaf | null = null;
+
+  constructor(app: App, settings: MnemosyneSettings, statusBarItem: HTMLElement) {
+    this.app = app;
+    this.settings = settings;
+    this.statusBarItem = statusBarItem;
+    this.effectManager = new EffectManager(app, settings);
+  }
+
+  startSession() {
+    this.applyFilters();
+    if (this.files.length === 0) {
+      new Notice('There are no notes.');
+      return;
+    }
+    this.currentIndex = 0;
+    this.updateStatusBarItem();
+    this.openNote(this.files[this.currentIndex]);
+
+    if (this.settings.timerEnabled) {
+      this.effectManager = new EffectManager(this.app, this.settings);
+      this.startTimer();
+    } else {
+      this.effectManager.resetEffect();
+    }
+  }
+
+  getNextNote() {
+    if (this.files.length === 0) {
+      this.stopSession();
+      return;
     }
 
-    startSession() {
-        console.log("Starting session...");
-        this.applyFilters();
-        console.log(`Files after applying filters: ${this.files.length}`);
-        if (this.files.length === 0) {
-            new Notice("There are no notes.");
-            return;
-        }
+    // Move to the next note
+    this.currentIndex = (this.currentIndex + 1) % this.files.length;
+    const nextNote = this.files[this.currentIndex];
+    if (nextNote) {
+      this.openNote(nextNote);
+    }
+
+    if (this.settings.timerEnabled) {
+      this.resetTimer();
+    }
+
+    this.updateStatusBarItem();
+  }
+
+  applyFilters() {
+    const allFiles = this.app.vault.getMarkdownFiles();
+    this.files = allFiles.filter((file) => matchesFilters(file, this.app, this.settings));
+    this.shuffleFiles();
+  }
+
+  shuffleFiles() {
+    for (let i = this.files.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.files[i], this.files[j]] = [this.files[j], this.files[i]];
+    }
+  }
+
+  openNote(note: TFile) {
+    this.effectManager.resetEffect();
+
+    this.app.vault.read(note).then((content) => {
+      this.originalContent = content;
+      // Open the original content in a side pane
+    });
+
+    // Open the note in the main view
+    this.app.workspace.getLeaf(false).openFile(note).then(() => {
+      if (this.settings.timerEnabled) {
+        this.effectManager.applyEffect(this.remainingTime, this.settings.timePerNote);
+      }
+    });
+  }
+
+  updateStatusBarItem() {
+    if (this.statusBarItem) {
+      let text = `Mnemosyne session active. (${this.files.length} notes total.)`;
+      if (this.settings.timerEnabled && this.settings.showStatusBarTimer) {
+        const timeLeft = this.formatTime(this.remainingTime);
+        text += ` Time left: ${timeLeft}`;
+      }
+      this.statusBarItem.setText(text);
+    }
+  }
+
+  removeCurrentNote() {
+    if (this.files.length === 0) {
+      new Notice('No session is active.');
+      return;
+    }
+
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!activeFile) {
+      new Notice('No active file to remove.');
+      return;
+    }
+
+    const index = this.files.findIndex((file) => file.path === activeFile.path);
+    if (index !== -1) {
+      this.files.splice(index, 1);
+      new Notice(`Removed "${activeFile.basename}" from the session.`);
+
+      // Adjust currentIndex if necessary
+      if (this.currentIndex >= this.files.length) {
         this.currentIndex = 0;
-        this.updateStatusBarItem();
-        this.openNote(this.files[this.currentIndex]);
-    }
-
-    getNextNote() {
-        if (this.files.length === 0) {
-            new Notice("Mnemonic session completed");
-            this.statusBarItem.setText('No Mnemosyne session active.');
-            return;
-        }
-        this.currentIndex = (this.currentIndex + 1) % this.files.length;
-        const nextNote = this.files[this.currentIndex];
-        if (nextNote) {
-            this.openNote(nextNote);
-        }
-        this.updateStatusBarItem();
-    }
-
-    applyFilters() {
-        const allFiles = this.app.vault.getMarkdownFiles();
-        console.log(`Total markdown files: ${allFiles.length}`);
-      
-        this.files = allFiles.filter((file) => {
-          const cache = this.app.metadataCache.getFileCache(file);
-          const tags = cache ? getAllTags(cache) ?? [] : [];
-      
-          // 1. If 'iterateAllFiles' is true, include all notes regardless of tags
-          if (this.settings.iterateAllFiles) {
-            return true;
-          }
-      
-          // 2. If 'allTagsSelected' is true, include all notes
-          if (this.settings.allTagsSelected) {
-            return true;
-          }
-      
-          // 3. Exclude notes that have any of the excluded tags
-          if (this.settings.excludedTags.some((tag) => tags.includes(tag))) {
-            return false; // Exclude this note
-          }
-      
-          // 4. If included tags are specified, include notes that have any of them
-          if (this.settings.includedTags.length > 0) {
-            if (this.settings.includedTags.some((tag) => tags.includes(tag))) {
-              return true; // Include this note
-            } else {
-              return false; // Exclude this note
-            }
-          }
-      
-          // 5. If no included tags are specified, and the note doesn't have any excluded tags, include it
-          return true; // Include this note
-        });
-      
-        console.log(`Files after filtering: ${this.files.length}`);
-        this.shuffleFiles();
       }
 
-    shuffleFiles() {
-        for (let i = this.files.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this.files[i], this.files[j]] = [this.files[j], this.files[i]];
-        }
+      if (this.files.length === 0) {
+        new Notice('All notes have been removed from the session.');
+        this.stopSession();
+        return;
+      }
+
+      // Open the next note
+      this.openNote(this.files[this.currentIndex]);
+      this.updateStatusBarItem();
+    } else {
+      new Notice('The active note is not part of the session.');
     }
 
-    openNote(note: TFile) {
-        this.app.workspace.openLinkText(note.path, '', false);
+    if (this.settings.timerEnabled) {
+      this.resetTimer();
     }
+  }
 
-    updateStatusBarItem() {
-        if (this.statusBarItem) {
-            this.statusBarItem.setText(`Mnemosyne session active. (${this.files.length} notes total.)`);
-        }
-    }
+  stopSession() {
+    this.stopTimer();
+    this.files = [];
+    this.currentIndex = 0;
+    this.updateStatusBarItem();
+    new Notice('Mnemosyne session stopped.');
+  }
 
-    removeCurrentNote() {
-        if (this.files.length === 0) {
-            new Notice("No session is active.");
-            return;
-        }
+  // Timer methods
+  startTimer() {
+    this.remainingTime = this.settings.timePerNote;
+    this.effectManager.applyEffect(this.remainingTime, this.settings.timePerNote);
 
-        const activeFile = this.app.workspace.getActiveFile();
-        if (!activeFile) {
-            new Notice("No active file to remove.");
-            return;
-        }
+    this.updateStatusBarItem();
 
-        const index = this.files.findIndex(file => file.path === activeFile.path);
-        if (index !== -1) {
-            this.files.splice(index, 1);
-            new Notice(`Removed "${activeFile.basename}" from the session.`);
-            
-            // Adjust currentIndex if necessary
-            if (this.currentIndex >= this.files.length) {
-                this.currentIndex = 0;
-            }
+    this.stopTimer();
 
-            if (this.files.length === 0) {
-                new Notice("All notes have been removed from the session.");
-                this.statusBarItem.setText('No Mnemosyne session active.');
-            
-                // Reset session state
-                this.currentIndex = 0;
-                this.files = [];
-                return;
-            }
-            
+    this.intervalId = window.setInterval(() => {
+      if (this.remainingTime > 0) {
+        this.remainingTime--;
+        this.effectManager.applyEffect(this.remainingTime, this.settings.timePerNote);
 
-            // Open the next note
-            this.openNote(this.files[this.currentIndex]);
-            this.updateStatusBarItem();
+        // Update status bar each second
+        this.updateStatusBarItem();
+      }
+
+      if (this.remainingTime <= 0) {
+        // Check if there are more notes
+        if (this.files.length > 0) {
+          this.getNextNote();
         } else {
-            new Notice("The active note is not part of the session.");
+          // No more notes, stop the session
+          this.stopSession();
         }
+      }
+    }, 1000);
+  }
+
+  resetTimer() {
+    this.stopTimer();
+    this.startTimer();
+  }
+
+  stopTimer() {
+    if (this.intervalId !== null) {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
     }
+    this.effectManager.resetEffect();
+  }
+
+  private formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }
 
 }

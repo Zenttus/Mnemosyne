@@ -1,18 +1,17 @@
+// Mnemosyne.ts
 import { Plugin, Notice } from 'obsidian';
 import { MnemosyneSession } from './MnemosyneSession';
 import { DEFAULT_SETTINGS } from './MnemosyneSettings';
 import { MnemosyneSidebarView } from './MnemosyneSidebarView';
 import { MnemosyneSettingTab } from './MnemosyneSettingTab';
+import { OriginalContentView } from './OriginalContentView';
 export default class Mnemosyne extends Plugin {
     async onload() {
-        console.log("Mnemosyne plugin loaded.");
         await this.loadSettings();
-        // Load the stylesheet
-        this.addStylesheet();
+        this.addStyles();
         // Create status bar item
         const statusBarItemEl = this.addStatusBarItem();
-        statusBarItemEl.setText('No Mnemosyne session active.');
-        // Initialize Mnemosyne session
+        statusBarItemEl.setText('');
         this.mnemosyneSession = new MnemosyneSession(this.app, this.settings, statusBarItemEl);
         // Add commands
         this.addCommand({
@@ -20,7 +19,7 @@ export default class Mnemosyne extends Plugin {
             name: 'Next Note',
             callback: () => {
                 this.mnemosyneSession.getNextNote();
-            }
+            },
         });
         this.addCommand({
             id: 'start-mnemosyne',
@@ -28,32 +27,31 @@ export default class Mnemosyne extends Plugin {
             callback: () => {
                 this.mnemosyneSession.startSession();
                 new Notice('Mnemosyne session started.');
-            }
+            },
         });
-        // **Add the Remove Note command**
         this.addCommand({
             id: 'remove-current-note-mnemosyne',
             name: 'Remove Current Note from Session',
             callback: () => {
                 this.mnemosyneSession.removeCurrentNote();
             },
-            // **Add a default hotkey (e.g., Ctrl+Shift+R on Windows/Linux or Cmd+Shift+R on macOS)**
             hotkeys: [
                 {
-                    modifiers: ["Mod", "Shift"],
-                    key: "R"
-                }
-            ]
+                    modifiers: ['Mod', 'Shift'],
+                    key: 'R',
+                },
+            ],
         });
-        // Register the sidebar view
+        // Register views
         this.registerView('mnemosyne-sidebar-view', (leaf) => new MnemosyneSidebarView(leaf, this));
-        // Add ribbon icon
+        this.registerView('mnemosyne-original-content-view', (leaf) => new OriginalContentView(leaf));
         this.addRibbonIcon('switch', 'Mnemosyne', () => this.activateSidebarView());
         this.addSettingTab(new MnemosyneSettingTab(this.app, this));
     }
     async onunload() {
-        console.log("Mnemosyne plugin unloaded.");
+        this.mnemosyneSession.stopSession();
         this.app.workspace.detachLeavesOfType('mnemosyne-sidebar-view');
+        this.app.workspace.detachLeavesOfType('mnemosyne-original-content-view');
     }
     async activateSidebarView() {
         this.app.workspace.detachLeavesOfType('mnemosyne-sidebar-view');
@@ -65,20 +63,17 @@ export default class Mnemosyne extends Plugin {
             });
             this.app.workspace.revealLeaf(this.app.workspace.getLeavesOfType('mnemosyne-sidebar-view')[0]);
         }
-        else {
-            new Notice('No right leaf available to display the Mnemosyne sidebar.');
-        }
     }
-    addStylesheet() {
-        this.registerDomEvent(document, 'DOMContentLoaded', () => {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = this.getAssetPath('styles.css');
-            document.head.appendChild(link);
+    addStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+    /* CSS content from styles.css */
+    /* ... existing CSS ... */
+    `;
+        document.head.appendChild(style);
+        this.register(() => {
+            style.remove();
         });
-    }
-    getAssetPath(assetName) {
-        return this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/${assetName}`);
     }
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());

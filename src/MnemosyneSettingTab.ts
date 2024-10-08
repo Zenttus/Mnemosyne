@@ -1,6 +1,6 @@
 // MnemosyneSettingTab.ts
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, ColorComponent, DropdownComponent } from 'obsidian';
 import Mnemosyne from './Mnemosyne';
 
 export class MnemosyneSettingTab extends PluginSettingTab {
@@ -17,16 +17,54 @@ export class MnemosyneSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl('h2', { text: 'Mnemosyne Settings' });
 
+    // Effect Type Dropdown
     new Setting(containerEl)
-      .setName('Iterate All Files')
-      .setDesc('Include all notes in the session, ignoring tags.')
-      .addToggle((toggle) =>
+      .setName('Effect Type')
+      .setDesc('Select the type of effect to apply during the session.')
+      .addDropdown((dropdown: DropdownComponent) => {
+        dropdown.addOption('Background', 'Background Color');
+        dropdown.addOption('FillUp', 'Fill Up Effect');
+        dropdown.setValue(this.plugin.settings.effectType);
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.effectType = value as 'Background' | 'FillUp';
+          await this.plugin.saveSettings();
+          this.display(); // Refresh
+        });
+      });
+
+    // Color Pickers
+    new Setting(containerEl)
+      .setName('Start Color')
+      .setDesc('Select the start color for the effect transition.')
+      .addColorPicker((colorPicker: ColorComponent) => {
+        colorPicker.setValue(this.plugin.settings.startColor);
+        colorPicker.onChange(async (value) => {
+          this.plugin.settings.startColor = value;
+          await this.plugin.saveSettings();
+        });
+      });
+    new Setting(containerEl)
+      .setName('End Color')
+      .setDesc('Select the end color for the effect transition.')
+      .addColorPicker((colorPicker: ColorComponent) => {
+        colorPicker.setValue(this.plugin.settings.endColor);
+        colorPicker.onChange(async (value) => {
+          this.plugin.settings.endColor = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    // Options
+    new Setting(containerEl)
+      .setName('Show Timer in Status Bar')
+      .setDesc('Display the remaining time in the status bar at the bottom.')
+      .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.iterateAllFiles)
+          .setValue(this.plugin.settings.showStatusBarTimer)
           .onChange(async (value) => {
-            this.plugin.settings.iterateAllFiles = value;
+            this.plugin.settings.showStatusBarTimer = value;
             await this.plugin.saveSettings();
-          })
-      );
+          });
+      });
   }
 }

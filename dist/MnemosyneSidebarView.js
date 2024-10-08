@@ -1,4 +1,7 @@
-import { ItemView, ButtonComponent, getAllTags } from 'obsidian';
+// MnemosyneSidebarView.ts
+import { matchesFilters } from './MnemosyneUtils';
+import { ItemView, ButtonComponent, getAllTags, Notice } from 'obsidian';
+import { ToggleComponent, Setting } from 'obsidian';
 export class MnemosyneSidebarView extends ItemView {
     constructor(leaf, plugin) {
         super(leaf);
@@ -14,40 +17,75 @@ export class MnemosyneSidebarView extends ItemView {
         return 'Mnemosyne Sidebar';
     }
     async onOpen() {
-        const container = this.containerEl.children[1];
+        const container = this.contentEl;
         container.empty();
+        container.addClass('mnemosyne-sidebar-container');
         const header = container.createEl('h4', { text: 'Mnemosyne Session' });
         header.style.marginBottom = '10px';
         // Create container for session control buttons
         const sessionControlContainer = container.createDiv({ cls: 'session-control-container' });
-        sessionControlContainer.style.display = 'flex';
-        sessionControlContainer.style.flexDirection = 'column';
-        sessionControlContainer.style.gap = '10px';
-        sessionControlContainer.style.marginBottom = '20px';
         // Start Session button
         const startSessionButton = new ButtonComponent(sessionControlContainer);
         startSessionButton.setButtonText('Start Session').onClick(() => {
             this.plugin.mnemosyneSession.startSession();
         });
+        // Timer Mode Toggle
+        const timerToggleContainer = sessionControlContainer.createDiv({ cls: 'timer-toggle-container' });
+        const timerToggleLabel = timerToggleContainer.createEl('span', { text: 'Enable Timer Mode' });
+        const timerToggle = new ToggleComponent(timerToggleContainer);
+        timerToggle.setValue(this.plugin.settings.timerEnabled)
+            .onChange(async (value) => {
+            this.plugin.settings.timerEnabled = value;
+            await this.plugin.saveSettings();
+            // Show or hide the timer options and additional buttons
+            timerOptionsContainer.toggleClass('hidden', !value);
+            additionalButtonsContainer.toggleClass('hidden', !value);
+        });
+        // Timer options container (hidden if timer not enabled)
+        const timerOptionsContainer = sessionControlContainer.createDiv({ cls: 'timer-options-container' });
+        timerOptionsContainer.toggleClass('hidden', !this.plugin.settings.timerEnabled);
+        // Time input in minutes
+        new Setting(timerOptionsContainer)
+            .setName('Time per note (minutes)')
+            .addText((text) => {
+            text.setPlaceholder('Enter time in minutes')
+                .setValue(String(this.plugin.settings.timePerNote / 60))
+                .onChange(async (value) => {
+                const minutes = parseFloat(value);
+                if (!isNaN(minutes) && minutes > 0) {
+                    this.plugin.settings.timePerNote = minutes * 60; // Convert to seconds
+                    await this.plugin.saveSettings();
+                }
+                else {
+                    new Notice('Please enter a valid number greater than 0.');
+                }
+            });
+        });
+        // Additional buttons container (hidden if timer not enabled)
+        const additionalButtonsContainer = sessionControlContainer.createDiv({ cls: 'additional-buttons-container' });
+        additionalButtonsContainer.toggleClass('hidden', !this.plugin.settings.timerEnabled);
         // Next Note button
-        const nextNoteButton = new ButtonComponent(sessionControlContainer);
+        const nextNoteButton = new ButtonComponent(additionalButtonsContainer);
         nextNoteButton.setButtonText('Next Note').onClick(() => {
             this.plugin.mnemosyneSession.getNextNote();
         });
         // Remove Note button
-        const removeNoteButton = new ButtonComponent(sessionControlContainer);
+        const removeNoteButton = new ButtonComponent(additionalButtonsContainer);
         removeNoteButton.setButtonText('Remove Note').onClick(() => {
             this.plugin.mnemosyneSession.removeCurrentNote();
         });
-        // Add note count display
+        // Stop Session button
+        const stopSessionButton = new ButtonComponent(additionalButtonsContainer);
+        stopSessionButton.setButtonText('Stop Session').onClick(() => {
+            this.plugin.mnemosyneSession.stopSession();
+        });
+        // Note count display
         this.noteCountElement = container.createEl('div', { cls: 'mnemosyne-note-count' });
         this.noteCountElement.style.marginBottom = '10px';
         this.updateNoteCount();
-        // Create container for tags
         this.tagsContainer = container.createDiv({ cls: 'mnemosyne-tags-container' });
-        // Create tag buttons
         this.createTagButtons();
-        // Register to update tags when the vault changes
+        // Register event handlers
         this.registerEvent(this.app.vault.on('modify', this.handleVaultChange.bind(this)));
         this.registerEvent(this.app.vault.on('delete', this.handleVaultChange.bind(this)));
         this.registerEvent(this.app.vault.on('create', this.handleVaultChange.bind(this)));
@@ -64,7 +102,7 @@ export class MnemosyneSidebarView extends ItemView {
     async onClose() {
         // No cleanup necessary
     }
-    // Fetch all available tags from the vault and their counts
+    // Fetch tags and their counts
     fetchAvailableTags() {
         const files = this.app.vault.getMarkdownFiles();
         const tagCounts = {};
@@ -76,7 +114,7 @@ export class MnemosyneSidebarView extends ItemView {
                 tagCounts[tag] = (tagCounts[tag] || 0) + 1;
             });
         });
-        // Convert the tags to an array and sort alphabetically
+        // Convert to array and sort alphabetically
         this.availableTags = Object.keys(tagCounts).sort((a, b) => a.localeCompare(b));
         this.tagCounts = tagCounts;
     }
@@ -99,50 +137,20 @@ export class MnemosyneSidebarView extends ItemView {
         sectionHeader.style.margin = '0';
         // Add a reset button
         const resetButton = headerContainer.createEl('button', { cls: 'reset-button' });
-        resetButton.innerHTML = '⟲'; // Reset icon
+        resetButton.innerHTML = ' ⟲ '; // Reset icon
         resetButton.title = 'Reset tags';
-        resetButton.onclick = async () => {
-            // Clear the selected tags
+        resetButton.addEventListener('click', async () => {
             this.plugin.settings.includedTags = [];
             this.plugin.settings.excludedTags = [];
-            this.plugin.settings.allTagsSelected = false;
-            // Save settings
             await this.plugin.saveSettings();
-            // Refresh tags
+            // Refresh 
             this.createTagButtons();
-        };
-        const buttonGrid = this.tagsContainer.createDiv({ cls: 'mnemosyne-button-grid' });
-        // Add '*' button
-        const allTagsButton = buttonGrid.createEl('button', { text: '*', cls: 'tag-button' });
-        // Apply selected style if '*' is selected
-        if (this.plugin.settings.allTagsSelected) {
-            allTagsButton.addClass('tag-button-all-selected');
-        }
-        allTagsButton.addEventListener('click', async () => {
-            if (this.plugin.settings.allTagsSelected) {
-                // Deselect '*'
-                this.plugin.settings.allTagsSelected = false;
-                allTagsButton.removeClass('tag-button-all-selected');
-            }
-            else {
-                // Select '*', reset other tags
-                this.plugin.settings.allTagsSelected = true;
-                this.plugin.settings.includedTags = [];
-                this.plugin.settings.excludedTags = [];
-                allTagsButton.addClass('tag-button-all-selected');
-            }
-            // Save settings
-            await this.plugin.saveSettings();
-            // Refresh tags
-            this.createTagButtons();
-            // Update note count after changes
-            await updateNoteCount();
+            this.updateNoteCount();
         });
+        const buttonGrid = this.tagsContainer.createDiv({ cls: 'mnemosyne-button-grid' });
+        buttonGrid.removeClass('proportional-buttons');
         // Create a button for each tag
         this.availableTags.forEach(tag => {
-            // Disable other tags if '*' is selected
-            if (this.plugin.settings.allTagsSelected)
-                return;
             // Get the count for the tag
             const tagCount = this.tagCounts[tag] || 0;
             // Update the button text to include the count
@@ -209,32 +217,13 @@ export class MnemosyneSidebarView extends ItemView {
             });
         });
     }
-    // Method to update the note count display
     updateNoteCount() {
         const noteCount = this.calculateMatchingNotes();
         this.noteCountElement.setText(`Notes matching current selection: ${noteCount}`);
     }
-    // Method to calculate the number of notes matching the current tag selection
     calculateMatchingNotes() {
         const allFiles = this.app.vault.getMarkdownFiles();
-        const matchingFiles = allFiles.filter((file) => {
-            var _a;
-            const cache = this.app.metadataCache.getFileCache(file);
-            const tags = cache ? (_a = getAllTags(cache)) !== null && _a !== void 0 ? _a : [] : [];
-            if (this.plugin.settings.iterateAllFiles) {
-                return true;
-            }
-            if (this.plugin.settings.allTagsSelected) {
-                return true;
-            }
-            if (this.plugin.settings.excludedTags.some((tag) => tags.includes(tag))) {
-                return false;
-            }
-            if (this.plugin.settings.includedTags.length > 0) {
-                return this.plugin.settings.includedTags.some((tag) => tags.includes(tag));
-            }
-            return true;
-        });
+        const matchingFiles = allFiles.filter(file => matchesFilters(file, this.app, this.plugin.settings));
         return matchingFiles.length;
     }
 }
