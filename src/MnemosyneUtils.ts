@@ -1,5 +1,3 @@
-// MnemosyneUtils.ts
-
 import { TFile, App, getAllTags } from 'obsidian';
 import { MnemosyneSettings } from './MnemosyneSettings';
 

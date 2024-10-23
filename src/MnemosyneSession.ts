@@ -1,5 +1,3 @@
-// MnemosyneSession.ts
-
 import { TFile, App, Notice, getAllTags, WorkspaceLeaf } from 'obsidian';
 import { MnemosyneSettings } from './MnemosyneSettings';
 import { matchesFilters } from './MnemosyneUtils';
@@ -15,10 +13,6 @@ export class MnemosyneSession {
   private intervalId: number | null = null;
   private remainingTime: number = 0;
   private effectManager: EffectManager;
-
-  // Store original content
-  private originalContent: string = '';
-  private originalContentLeaf: WorkspaceLeaf | null = null;
 
   constructor(app: App, settings: MnemosyneSettings, statusBarItem: HTMLElement) {
     this.app = app;
@@ -80,13 +74,7 @@ export class MnemosyneSession {
 
   openNote(note: TFile) {
     this.effectManager.resetEffect();
-
-    this.app.vault.read(note).then((content) => {
-      this.originalContent = content;
-      // Open the original content in a side pane
-    });
-
-    // Open the note in the main view
+    // Open note in main view
     this.app.workspace.getLeaf(false).openFile(note).then(() => {
       if (this.settings.timerEnabled) {
         this.effectManager.applyEffect(this.remainingTime, this.settings.timePerNote);
@@ -172,7 +160,13 @@ export class MnemosyneSession {
       }
 
       if (this.remainingTime <= 0) {
+        // TODO make this a setting
+        const soundPath = this.app.vault.adapter.getResourcePath('.obsidian/plugins/obsidian-mnemosyne/src/ding.mp3');
+
+        const audio = new Audio(soundPath);
+        audio.play();
         // Check if there are more notes
+
         if (this.files.length > 0) {
           this.getNextNote();
         } else {

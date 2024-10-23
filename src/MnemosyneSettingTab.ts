@@ -1,5 +1,3 @@
-// MnemosyneSettingTab.ts
-
 import { App, PluginSettingTab, Setting, ColorComponent, DropdownComponent } from 'obsidian';
 import Mnemosyne from './Mnemosyne';
 
@@ -53,8 +51,6 @@ export class MnemosyneSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
-
-    // Options
     new Setting(containerEl)
       .setName('Show Timer in Status Bar')
       .setDesc('Display the remaining time in the status bar at the bottom.')

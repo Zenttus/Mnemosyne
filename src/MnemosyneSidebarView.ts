@@ -1,4 +1,3 @@
-// MnemosyneSidebarView.ts
 import { matchesFilters } from './MnemosyneUtils';
 import { ItemView, WorkspaceLeaf, ButtonComponent, getAllTags, Notice } from 'obsidian';
 import Mnemosyne from './Mnemosyne';
