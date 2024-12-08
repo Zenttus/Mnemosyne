@@ -11,7 +11,7 @@ export default class Mnemosyne extends Plugin {
 
 	async onload() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-		this.mnemosyneSession = new MnemosyneSession(this.app, this.settings, this.addStatusBarItem());
+		this.mnemosyneSession = new MnemosyneSession(this.app, this.settings, this.addStatusBarItem(), this);
 
 		this.registerView('mnemosyne-sidebar-view', (leaf) => new MnemosyneSidebarView(leaf, this));
 		this.registerView('mnemosyne-original-content-view', (leaf) => new OriginalContentView(leaf));

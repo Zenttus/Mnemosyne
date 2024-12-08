@@ -30,90 +30,94 @@ export class MnemosyneSidebarView extends ItemView {
         const container = this.contentEl;
         container.empty();
         container.addClass('mnemosyne-sidebar-container');
-      
+
         const header = container.createEl('h4', { text: 'Mnemosyne Session' });
         header.style.marginBottom = '10px';
-      
+
         // Create container for session control buttons
         const sessionControlContainer = container.createDiv({ cls: 'session-control-container' });
-      
+
         // Start Session button
         const startSessionButton = new ButtonComponent(sessionControlContainer);
         startSessionButton.setButtonText('Start Session').onClick(() => {
-          this.plugin.mnemosyneSession.startSession();
+            this.plugin.mnemosyneSession.startSession();
         });
-      
+
         // Timer Mode Toggle
         const timerToggleContainer = sessionControlContainer.createDiv({ cls: 'timer-toggle-container' });
         const timerToggleLabel = timerToggleContainer.createEl('span', { text: 'Enable Timer Mode' });
         const timerToggle = new ToggleComponent(timerToggleContainer);
         timerToggle.setValue(this.plugin.settings.timerEnabled)
-          .onChange(async (value) => {
-            this.plugin.settings.timerEnabled = value;
-            await this.plugin.saveSettings();
-      
-            // Show or hide the timer options and additional buttons
-            timerOptionsContainer.toggleClass('hidden', !value);
-            additionalButtonsContainer.toggleClass('hidden', !value);
-          });
-      
+            .onChange(async (value) => {
+                this.plugin.settings.timerEnabled = value;
+                await this.plugin.saveSettings();
+
+                // Show or hide the timer options and additional buttons
+                timerOptionsContainer.toggleClass('hidden', !value);
+                additionalButtonsContainer.toggleClass('hidden', !value);
+
+                if (this.plugin.mnemosyneSession) {
+                    this.plugin.mnemosyneSession.updateTimerMode(value);
+                }
+            });
+
         // Timer options container (hidden if timer not enabled)
         const timerOptionsContainer = sessionControlContainer.createDiv({ cls: 'timer-options-container' });
         timerOptionsContainer.toggleClass('hidden', !this.plugin.settings.timerEnabled);
-      
+
         // Time input in minutes
         new Setting(timerOptionsContainer)
-          .setName('Time per note (minutes)')
-          .addText((text) => {
-            text.setPlaceholder('Enter time in minutes')
-              .setValue(String(this.plugin.settings.timePerNote / 60))
-              .onChange(async (value) => {
-                const minutes = parseFloat(value);
-                if (!isNaN(minutes) && minutes > 0) {
-                  this.plugin.settings.timePerNote = minutes * 60; // Convert to seconds
-                  await this.plugin.saveSettings();
-                } else {
-                  new Notice('Please enter a valid number greater than 0.');
-                }
-              });
-          });
-      
+            .setName('Time per note (minutes)')
+            .addText((text) => {
+                text.setPlaceholder('Enter time in minutes')
+                    .setValue(String(this.plugin.settings.timePerNote / 60))
+                    .onChange(async (value) => {
+                        const minutes = parseFloat(value);
+                        if (!isNaN(minutes) && minutes > 0) {
+                            this.plugin.settings.timePerNote = minutes * 60; // Convert to seconds
+                            await this.plugin.saveSettings();
+                        } else {
+                            new Notice('Please enter a valid number greater than 0.');
+                        }
+                    });
+            });
+
         // Additional buttons container (hidden if timer not enabled)
         const additionalButtonsContainer = sessionControlContainer.createDiv({ cls: 'additional-buttons-container' });
         additionalButtonsContainer.toggleClass('hidden', !this.plugin.settings.timerEnabled);
-      
+
         // Next Note button
         const nextNoteButton = new ButtonComponent(additionalButtonsContainer);
         nextNoteButton.setButtonText('Next Note').onClick(() => {
-          this.plugin.mnemosyneSession.getNextNote();
+            this.plugin.mnemosyneSession.getNextNote();
         });
-      
+
         // Remove Note button
         const removeNoteButton = new ButtonComponent(additionalButtonsContainer);
         removeNoteButton.setButtonText('Remove Note').onClick(() => {
-          this.plugin.mnemosyneSession.removeCurrentNote();
+            this.plugin.mnemosyneSession.removeCurrentNote();
         });
-      
+
         // Stop Session button
         const stopSessionButton = new ButtonComponent(additionalButtonsContainer);
         stopSessionButton.setButtonText('Stop Session').onClick(() => {
-          this.plugin.mnemosyneSession.stopSession();
+            this.plugin.mnemosyneSession.stopSession();
         });
-      
+
         // Note count display
         this.noteCountElement = container.createEl('div', { cls: 'mnemosyne-note-count' });
         this.noteCountElement.style.marginBottom = '10px';
         this.updateNoteCount();
-      
+
         this.tagsContainer = container.createDiv({ cls: 'mnemosyne-tags-container' });
-      
+
         this.createTagButtons();
-      
+
         // Register event handlers
         this.registerEvent(this.app.vault.on('modify', this.handleVaultChange.bind(this)));
         this.registerEvent(this.app.vault.on('delete', this.handleVaultChange.bind(this)));
         this.registerEvent(this.app.vault.on('create', this.handleVaultChange.bind(this)));
-      }
+    }
 
     // Handler for vault changes
     handleVaultChange() {
@@ -184,7 +188,7 @@ export class MnemosyneSidebarView extends ItemView {
         const buttonGrid = this.tagsContainer.createDiv({ cls: 'mnemosyne-button-grid' });
 
         buttonGrid.removeClass('proportional-buttons');
-    
+
         // Create a button for each tag
         this.availableTags.forEach(tag => {
             // Get the count for the tag

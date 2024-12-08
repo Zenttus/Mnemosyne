@@ -2,23 +2,28 @@ import { TFile, App, Notice, getAllTags, WorkspaceLeaf } from 'obsidian';
 import { MnemosyneSettings } from './MnemosyneSettings';
 import { matchesFilters } from './MnemosyneUtils';
 import { EffectManager } from './EffectManager';
+import Mnemosyne from './Mnemosyne';
 
 export class MnemosyneSession {
   private files: TFile[] = [];
   private settings: MnemosyneSettings;
   private statusBarItem: HTMLElement;
   private app: App;
+  private plugin: Mnemosyne;
 
   private currentIndex: number = 0;
   private intervalId: number | null = null;
   private remainingTime: number = 0;
   private effectManager: EffectManager;
+  private logs: { timestamp: string; event: string; }[] = [];
 
-  constructor(app: App, settings: MnemosyneSettings, statusBarItem: HTMLElement) {
+  constructor(app: App, settings: MnemosyneSettings, statusBarItem: HTMLElement, plugin: Mnemosyne) {
+    this.plugin = plugin;
     this.app = app;
     this.settings = settings;
     this.statusBarItem = statusBarItem;
     this.effectManager = new EffectManager(app, settings);
+    this.plugin = plugin;
   }
 
   startSession() {
@@ -30,6 +35,7 @@ export class MnemosyneSession {
     this.currentIndex = 0;
     this.updateStatusBarItem();
     this.openNote(this.files[this.currentIndex]);
+    this.logEvent('Session started');
 
     if (this.settings.timerEnabled) {
       this.effectManager = new EffectManager(this.app, this.settings);
@@ -50,6 +56,7 @@ export class MnemosyneSession {
     const nextNote = this.files[this.currentIndex];
     if (nextNote) {
       this.openNote(nextNote);
+      this.logEvent(`Skipped to next note: ${nextNote.basename}`);
     }
 
     if (this.settings.timerEnabled) {
@@ -107,8 +114,10 @@ export class MnemosyneSession {
 
     const index = this.files.findIndex((file) => file.path === activeFile.path);
     if (index !== -1) {
+      const removedNote = this.files[index].basename;
       this.files.splice(index, 1);
-      new Notice(`Removed "${activeFile.basename}" from the session.`);
+      new Notice(`Removed "${removedNote}" from the session.`);
+      this.logEvent(`Removed note: ${removedNote}`);
 
       // Adjust currentIndex if necessary
       if (this.currentIndex >= this.files.length) {
@@ -117,9 +126,11 @@ export class MnemosyneSession {
 
       if (this.files.length === 0) {
         new Notice('All notes have been removed from the session.');
+        this.logEvent('All notes removed; session ended');
         this.stopSession();
         return;
       }
+
 
       // Open the next note
       this.openNote(this.files[this.currentIndex]);
@@ -139,6 +150,7 @@ export class MnemosyneSession {
     this.currentIndex = 0;
     this.updateStatusBarItem();
     new Notice('Mnemosyne session stopped.');
+    this.logEvent('Session stopped');
   }
 
   // Timer methods
@@ -196,4 +208,26 @@ export class MnemosyneSession {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   }
 
+  updateTimerMode(enabled: boolean) {
+    this.settings.timerEnabled = enabled;
+    if (this.files.length > 0) {
+      if (enabled && this.intervalId === null) {
+        this.startTimer();
+      } else if (!enabled && this.intervalId !== null) {
+        this.stopTimer();
+        this.effectManager.resetEffect();
+      }
+      this.logEvent(`Timer mode changed to ${enabled ? 'enabled' : 'disabled'}`);
+      this.updateStatusBarItem();
+    }
+  }
+
+  private async logEvent(message: string) {
+    const event = {
+      timestamp: new Date().toISOString(),
+      event: message
+    };
+    this.plugin.settings.logs.push(event);
+    await this.plugin.saveSettings();
+  }
 }

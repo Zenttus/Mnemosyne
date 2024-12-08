@@ -9,6 +9,7 @@ export interface MnemosyneSettings {
   startColor: string;
   endColor: string;
   showStatusBarTimer: boolean;
+  logs: { timestamp: string; event: string; }[];
 }
 
 export const DEFAULT_SETTINGS: MnemosyneSettings = {
@@ -21,4 +22,5 @@ export const DEFAULT_SETTINGS: MnemosyneSettings = {
   startColor: '#00FF00',
   endColor: '#FF0000',
   showStatusBarTimer: true,
+  logs: []
 };
